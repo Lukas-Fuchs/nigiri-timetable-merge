@@ -325,4 +325,12 @@ mem_dir mem_dir::read(std::string_view s) {
   return {dir};
 }
 
+std::string mem_dir::get_content() const {
+  std::string s = "\n";
+  for (auto const& [path, content] : dir_) {
+    s += fmt::format("#{}\n{}\n", path.string(), content);
+  }
+  return s;
+}
+
 }  // namespace nigiri::loader

@@ -90,6 +90,7 @@ struct mem_dir final : public dir {
   std::size_t file_size(std::filesystem::path const&) const final;
   dir_type type() const final;
   std::uint64_t hash() const final;
+  std::string get_content() const;
   dir_t dir_;
 };
 
