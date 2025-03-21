@@ -174,6 +174,16 @@ constexpr auto const berlin_trips_file_content =
 2,000861,3,"Golzow (PM), Schule",,,3,103
 )";
 
+constexpr auto const berlin_stop_times_content =
+    R"(trip_id,arrival_time,departure_time,stop_id,stop_sequence,pickup_type,drop_off_type,shape_dist_traveled,
+1,6:45,6:45,5100071,1,0,0,,
+1,,,9230005,2,0,0,,
+1,,,9230006,3,0,0,0.0,
+2,6:20,6:20,9230006,1,0,0,0.0,
+2,,,9230005,2,0,0,,
+2,6:10,6:10,5100071,3,0,0,,
+)";
+
 loader::mem_dir berlin_files() {
   using std::filesystem::path;
   return {{{path{kAgencyFile}, std::string{berlin_agencies_file_content}},
@@ -184,7 +194,8 @@ loader::mem_dir berlin_files() {
            {path{kTransfersFile}, std::string{berlin_transfers_file_content}},
            {path{kRoutesFile}, std::string{berlin_routes_file_content}},
            {path{kShapesFile}, std::string{berlin_shapes_file_content}},
-           {path{kTripsFile}, std::string{berlin_trips_file_content}}}};
+           {path{kTripsFile}, std::string{berlin_trips_file_content}},
+           {path{kStopTimesFile}, std::string{berlin_stop_times_content}}}};
 }
 
 }  // namespace nigiri::loader::gtfs
