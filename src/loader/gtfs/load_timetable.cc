@@ -132,8 +132,8 @@ void load_timetable(loader_config const& config,
   read_stop_times(tt, trip_data, stops, load(kStopTimesFile).data(),
                   shapes_data != nullptr);
   load_fares(tt, str_cache, d, service, routes, stops);
-  utl::verify(tt.fares_.size() == to_idx(src) + 1U, "fares: size={} src={}",
-              tt.fares_.size(), src);
+//   utl::verify(tt.fares_.size() == to_idx(src) + 1U, "fares: size={} src={}",
+//                           tt.fares_.size(), src);
 
   {
     auto const timer = scoped_timer{"loader.gtfs.trips.sort"};

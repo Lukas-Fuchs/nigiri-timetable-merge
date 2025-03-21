@@ -6,6 +6,7 @@
 
 #include "nigiri/loader/dir.h"
 #include "nigiri/loader/gtfs/loader.h"
+#include "nigiri/loader/gtfs/merge_timetable.h"
 #include "nigiri/loader/hrd/loader.h"
 #include "nigiri/loader/init_finish.h"
 #include "nigiri/timetable.h"
@@ -28,6 +29,17 @@ timetable load(std::vector<std::pair<std::string, loader_config>> const& paths,
                assistance_times* a,
                shapes_storage* shapes,
                bool ignore) {
+  return merge_load(paths, finalize_opt, date_range, a, shapes, ignore);
+}
+
+timetable serial_load(
+    std::vector<std::pair<std::string, loader_config>> const& paths,
+    finalize_options const& finalize_opt,
+    interval<date::sys_days> const& date_range,
+    assistance_times* a,
+    shapes_storage* shapes,
+    bool ignore) {
+
   auto const loaders = get_loaders();
 
   auto tt = timetable{};
@@ -63,6 +75,66 @@ timetable load(std::vector<std::pair<std::string, loader_config>> const& paths,
     } else {
       log(log_lvl::error, "loader.load", "no loader for {} found", path);
     }
+  }
+
+  finalize(tt, finalize_opt);
+
+  return tt;
+}
+
+timetable merge_load(
+    std::vector<std::pair<std::string, loader_config>> const& paths,
+    finalize_options const& finalize_opt,
+    interval<date::sys_days> const& date_range,
+    assistance_times* a,
+    shapes_storage* shapes,
+    bool ignore) {
+
+  auto const loaders = get_loaders();
+
+  std::vector<timetable> tables;
+  tables.reserve(paths.size() + 1);
+  tables.emplace_back();
+  auto& tt = tables[0];
+  tt.date_range_ = date_range;
+  register_special_stations(tt);
+
+  auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
+  auto cache =
+      string_cache_t{std::size_t{0U}, string_idx_hash{tt.strings_.strings_},
+                     string_idx_equals{tt.strings_.strings_}};
+
+  for (auto const [idx, in] : utl::enumerate(paths)) {
+    auto const& [path, local_config] = in;
+    auto const is_in_memory = path.starts_with("\n#");
+    auto const src = source_idx_t{idx};
+    auto const dir = is_in_memory
+                         // hack to load strings in integration tests
+                         ? std::make_unique<mem_dir>(mem_dir::read(path))
+                         : make_dir(path);
+    auto const it =
+        utl::find_if(loaders, [&](auto&& l) { return l->applicable(*dir); });
+    if (it != end(loaders)) {
+      if (!is_in_memory) {
+        log(log_lvl::info, "loader.load", "loading {}", path);
+      }
+      try {
+        timetable tt;
+        (*it)->load(local_config, src, *dir, tt, bitfields, cache, a, shapes);
+        tables.emplace_back(std::move(tt));
+      } catch (std::exception const& e) {
+        throw utl::fail("failed to load {}: {}", path, e.what());
+      }
+    } else if (!ignore) {
+      throw utl::fail("no loader for {} found", path);
+    } else {
+      log(log_lvl::error, "loader.load", "no loader for {} found", path);
+    }
+  }
+
+  tt = tables[0];
+  for (size_t i = 1; i < tables.size(); ++i) {
+    gtfs::merge_tables(tt, std::move(tables[i]), cache);
   }
 
   finalize(tt, finalize_opt);
