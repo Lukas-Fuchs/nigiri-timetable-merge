@@ -79,6 +79,14 @@ struct idx_offsets {
   bitfield correct(bitfield const& a) const { return a; }
   attribute correct(attribute const& a) const { return a; }
   delta correct(delta const& a) const { return a; }
+  geo::latlng correct(geo::latlng const& a) const { return a; }
+  u8_minutes correct(u8_minutes const& a) const { return a; }
+  location_type correct(location_type const& a) const { return a; }
+  timezone correct(timezone const& a) const { return a; }
+
+  location_id correct(location_id const& l) const {
+    return {l.id_, correct(l.src_)};
+  }
 
   footpath correct(footpath const& fp) const {
     return footpath{correct(fp.target()), fp.duration()};
@@ -227,15 +235,75 @@ void merge_tables(timetable& lhs, timetable&& rhs, string_cache_t& str_cache) {
   // TODO: locations_, transport and other composite members that might need
   // their indices corrected
 
+  ofs.merge_hashmap<location_id, location_idx_t>(
+      lhs.locations_.location_id_to_idx_,
+      std::move(rhs.locations_.location_id_to_idx_));
+
+  ofs.merge_vecvec<location_idx_t, char>(lhs.locations_.names_,
+                                         std::move(rhs.locations_.names_));
+
+  ofs.merge_vecvec<location_idx_t, char>(lhs.locations_.ids_,
+                                         std::move(rhs.locations_.ids_));
+
+  ofs.merge_vector_map<location_idx_t, geo::latlng>(
+      lhs.locations_.coordinates_, std::move(rhs.locations_.coordinates_));
+
+  ofs.merge_vector_map<location_idx_t, source_idx_t>(
+      lhs.locations_.src_, std::move(rhs.locations_.src_));
+
+  ofs.merge_vector_map<location_idx_t, u8_minutes>(
+      lhs.locations_.transfer_time_, std::move(rhs.locations_.transfer_time_));
+
+  ofs.merge_vector_map<location_idx_t, location_type>(
+      lhs.locations_.types_, std::move(rhs.locations_.types_));
+
+  ofs.merge_vector_map<location_idx_t, location_idx_t>(
+      lhs.locations_.parents_, std::move(rhs.locations_.parents_));
+
+  ofs.merge_vector_map<location_idx_t, timezone_idx_t>(
+      lhs.locations_.location_timezones_,
+      std::move(rhs.locations_.location_timezones_));
+
+  ofs.merge_fws_multimap<location_idx_t, location_idx_t>(
+      lhs.locations_.equivalences_, std::move(rhs.locations_.equivalences_));
+
+  ofs.merge_fws_multimap<location_idx_t, location_idx_t>(
+      lhs.locations_.children_, std::move(rhs.locations_.children_));
+
+  ofs.merge_fws_multimap<location_idx_t, footpath>(
+      lhs.locations_.preprocessing_footpaths_out_,
+      std::move(rhs.locations_.preprocessing_footpaths_out_));
+
+  ofs.merge_fws_multimap<location_idx_t, footpath>(
+      lhs.locations_.preprocessing_footpaths_in_,
+      std::move(rhs.locations_.preprocessing_footpaths_in_));
+
+  for (size_t p = 0; p < lhs.locations_.footpaths_out_.size(); ++p) {
+    ofs.merge_vecvec<location_idx_t, footpath>(
+        lhs.locations_.footpaths_out_[p],
+        std::move(rhs.locations_.footpaths_out_[p]));
+    ofs.merge_vecvec<location_idx_t, footpath>(
+        lhs.locations_.footpaths_in_[p],
+        std::move(rhs.locations_.footpaths_in_[p]));
+  }
+
+  ofs.merge_vector_map<timezone_idx_t, timezone>(
+      lhs.locations_.timezones_, std::move(rhs.locations_.timezones_));
+
   ofs.merge_vector(lhs.trip_id_to_idx_, std::move(rhs.trip_id_to_idx_));
+
   ofs.merge_fws_multimap<trip_idx_t, trip_id_idx_t>(lhs.trip_ids_,
                                                     std::move(rhs.trip_ids_));
+
   ofs.merge_vecvec<trip_id_idx_t, char>(lhs.trip_id_strings_,
                                         std::move(rhs.trip_id_strings_));
+
   ofs.merge_vector_map<trip_id_idx_t, source_idx_t>(
       lhs.trip_id_src_, std::move(rhs.trip_id_src_));
+
   ofs.merge_vector_map<trip_id_idx_t, uint32_t>(lhs.trip_train_nr_,
                                                 std::move(rhs.trip_train_nr_));
+
   ofs.merge_vector_map<trip_idx_t, route_id_idx_t>(
       lhs.trip_route_id_, std::move(rhs.trip_route_id_));
   lhs.next_route_id_idx_ = ofs.correct(rhs.next_route_id_idx_);
@@ -283,7 +351,7 @@ void merge_tables(timetable& lhs, timetable&& rhs, string_cache_t& str_cache) {
 
   ofs.merge_vector_map<transport_idx_t, bitfield_idx_t>(
       lhs.transport_traffic_days_, std::move(rhs.transport_traffic_days_));
-  // TODO: Continue with
+
   ofs.merge_vector_map<bitfield_idx_t, bitfield>(lhs.bitfields_,
                                                  std::move(rhs.bitfields_));
 
