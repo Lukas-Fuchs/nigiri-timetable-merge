@@ -85,8 +85,8 @@ void verify_timetable_sizes(timetable const& tt, timetable const& ref) {
 static timetable load_serial(
     std::vector<std::pair<std::string, loader_config>> paths) {
 
-  interval<date::sys_days> date_range{date::sys_days{1900_y / March / 1},
-                                      date::sys_days{3000_y / March / 2}};
+  interval<date::sys_days> date_range{date::sys_days{2024_y / March / 1},
+                                      date::sys_days{2025_y / March / 2}};
 
   return serial_load(paths, {}, date_range, nullptr, nullptr, false);
 }
@@ -94,8 +94,8 @@ static timetable load_serial(
 static timetable load_parallel(
     std::vector<std::pair<std::string, loader_config>> paths) {
 
-  interval<date::sys_days> date_range{date::sys_days{1900_y / March / 1},
-                                      date::sys_days{3000_y / March / 2}};
+  interval<date::sys_days> date_range{date::sys_days{2024_y / March / 1},
+                                      date::sys_days{2025_y / March / 2}};
 
   return serial_load(paths, {}, date_range, nullptr, nullptr, false);
 }
