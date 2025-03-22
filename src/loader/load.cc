@@ -120,6 +120,7 @@ timetable merge_load(
       }
       try {
         timetable tt;
+        tt.date_range_ = date_range;
         (*it)->load(local_config, src, *dir, tt, bitfields, cache, a, shapes);
         tables.emplace_back(std::move(tt));
       } catch (std::exception const& e) {
