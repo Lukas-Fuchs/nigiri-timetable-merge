@@ -3,6 +3,7 @@
 #include "nigiri/loader/load.h"
 #include "nigiri/loader/loader_interface.h"
 #include "nigiri/string_store.h"
+#include "compare_timetables.h"
 #include "date/date.h"
 #include "test_data.h"
 
@@ -107,15 +108,33 @@ static void compare_serial_parallel(
   auto tt_parallel = load_parallel(paths);
 
   verify_timetable_sizes(tt_serial, tt_parallel);
+  ASSERT_TRUE(compare_timetables(tt_serial, tt_parallel));
 }
 
+// If this test fails, the merge operation broke some aspect of the timetable,
+// provided the loading routines themselves are correct.
 TEST(gtfs, merge_single_timetable) {
   compare_serial_parallel({testdata::example});
   compare_serial_parallel({testdata::berlin});
 }
 
+// Tests that merging two timetables generally works.
 TEST(gtfs, merge_multiple_timetables) {
   compare_serial_parallel({testdata::example, testdata::berlin});
+}
+
+// Tests that each constituent timetable is contained in (a subset of) the
+// merged table.
+TEST(gtfs, merge_subset_relation) {
+  auto tt1 = load_parallel({testdata::example});
+  auto tt2 = load_parallel({testdata::berlin});
+  auto tta = load_parallel({testdata::example, testdata::berlin});
+  auto ttb = load_parallel({testdata::berlin, testdata::example});
+
+  ASSERT_TRUE(compare_timetables(tt1, tta));
+  ASSERT_TRUE(compare_timetables(tt2, tta));
+  ASSERT_TRUE(compare_timetables(tt1, ttb));
+  ASSERT_TRUE(compare_timetables(tt2, ttb));
 }
 
 }  // namespace
