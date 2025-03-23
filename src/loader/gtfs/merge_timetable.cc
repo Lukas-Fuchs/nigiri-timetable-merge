@@ -104,7 +104,13 @@ struct idx_offsets {
   }
 
   fares correct(fares&& f) const {
-    // TODO: Recursively correct all members
+    // Fares contain mostly self-contained mappings so most of them don't need
+    // correcting. Route IDs are from the timetable so they are corrected.
+    auto const old_networks = std::move(f.route_networks_);
+    f.route_networks_.clear();
+    for (auto const& [k, v] : old_networks) {
+      f.route_networks_.emplace(correct(k), v);
+    };
     return f;
   }
 
