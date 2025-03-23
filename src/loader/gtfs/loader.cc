@@ -21,6 +21,21 @@ void gtfs_loader::load(
       c, src, d, tt, global_bitfield_indices, cache, assistance, shapes_data);
 }
 
+void gtfs_loader::load_threadsafe(
+    loader_config const& c,
+    source_idx_t const src,
+    dir const& d,
+    timetable& tt,
+    hash_map<bitfield, bitfield_idx_t>& global_bitfield_indices,
+    string_cache_t& cache,
+    assistance_times* assistance,
+    shapes_storage* shapes_data,
+    std::mutex& mtx) const {
+  return nigiri::loader::gtfs::load_timetable_threadsafe(
+      c, src, d, tt, global_bitfield_indices, cache, assistance, shapes_data,
+      mtx);
+}
+
 cista::hash_t gtfs_loader::hash(dir const& d) const {
   return ::nigiri::loader::gtfs::hash(d);
 }

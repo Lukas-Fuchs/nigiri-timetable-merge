@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cassert>
 #include <array>
+#include <mutex>
 #include <string_view>
 
 #include "nigiri/loader/assistance.h"
@@ -23,6 +25,7 @@ struct loader_config {
 struct loader_interface {
   virtual ~loader_interface();
   virtual bool applicable(dir const&) const = 0;
+  virtual bool supports_parallel() const { return false; }
   virtual void load(loader_config const&,
                     source_idx_t,
                     dir const&,
@@ -31,6 +34,18 @@ struct loader_interface {
                     string_cache_t&,
                     assistance_times*,
                     shapes_storage*) const = 0;
+  virtual void load_threadsafe(loader_config const&,
+                               source_idx_t,
+                               dir const&,
+                               timetable&,
+                               hash_map<bitfield, bitfield_idx_t>&,
+                               string_cache_t&,
+                               assistance_times*,
+                               shapes_storage*,
+                               std::mutex&) const {
+    assert(false &&
+           "Tried to call threadsafe load function on non-threadsafe loader");
+  };
   virtual cista::hash_t hash(dir const&) const = 0;
   virtual std::string_view name() const = 0;
 };

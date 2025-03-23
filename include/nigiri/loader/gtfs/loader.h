@@ -6,6 +6,7 @@ namespace nigiri::loader::gtfs {
 
 struct gtfs_loader : public loader_interface {
   bool applicable(dir const&) const override;
+  bool supports_parallel() const override { return true; }
   void load(loader_config const&,
             source_idx_t const,
             dir const&,
@@ -14,6 +15,15 @@ struct gtfs_loader : public loader_interface {
             string_cache_t&,
             assistance_times*,
             shapes_storage*) const override;
+  void load_threadsafe(loader_config const&,
+                       source_idx_t const,
+                       dir const&,
+                       timetable&,
+                       hash_map<bitfield, bitfield_idx_t>&,
+                       string_cache_t&,
+                       assistance_times*,
+                       shapes_storage*,
+                       std::mutex&) const override;
   cista::hash_t hash(dir const&) const override;
   std::string_view name() const override;
 };

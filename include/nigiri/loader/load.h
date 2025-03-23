@@ -26,12 +26,13 @@ timetable load(std::vector<std::pair<std::string, loader_config>> const&,
                shapes_storage* = nullptr,
                bool ignore = false);
 
-timetable merge_load(std::vector<std::pair<std::string, loader_config>> const&,
-                     finalize_options const&,
-                     interval<date::sys_days> const&,
-                     assistance_times* = nullptr,
-                     shapes_storage* = nullptr,
-                     bool ignore = false);
+timetable parallel_load(
+    std::vector<std::pair<std::string, loader_config>> const&,
+    finalize_options const&,
+    interval<date::sys_days> const&,
+    assistance_times* = nullptr,
+    shapes_storage* = nullptr,
+    bool ignore = false);
 
 timetable serial_load(std::vector<std::pair<std::string, loader_config>> const&,
                       finalize_options const&,

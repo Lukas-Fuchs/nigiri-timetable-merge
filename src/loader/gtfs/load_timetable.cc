@@ -95,14 +95,15 @@ void load_timetable(loader_config const& config,
                  shapes_data);
 }
 
-void load_timetable(loader_config const& config,
-                    source_idx_t const src,
-                    dir const& d,
-                    timetable& tt,
-                    hash_map<bitfield, bitfield_idx_t>& bitfield_indices,
-                    string_cache_t& str_cache,
-                    assistance_times* assistance,
-                    shapes_storage* shapes_data) {
+void load_timetable_impl(loader_config const& config,
+                         source_idx_t const src,
+                         dir const& d,
+                         timetable& tt,
+                         hash_map<bitfield, bitfield_idx_t>& bitfield_indices,
+                         string_cache_t& str_cache,
+                         assistance_times* assistance,
+                         shapes_storage* shapes_data,
+                         std::mutex& mtx) {
   nigiri::scoped_timer const global_timer{"gtfs parser"};
 
   auto const load = [&](std::string_view file_name) -> file {
@@ -121,19 +122,24 @@ void load_timetable(loader_config const& config,
   auto const dates = read_calendar_date(load(kCalendarDatesFile).data());
   auto const service =
       merge_traffic_days(tt.internal_interval_days(), calendar, dates);
-  auto const shape_states =
-      (shapes_data != nullptr)
-          ? parse_shapes(load(kShapesFile).data(), *shapes_data)
-          : shape_loader_state{};
+  auto const shape_states = [&]() {
+    std::unique_lock lock(mtx);
+    return (shapes_data != nullptr)
+               ? parse_shapes(load(kShapesFile).data(), *shapes_data)
+               : shape_loader_state{};
+  }();
   auto trip_data =
       read_trips(tt, routes, service, shape_states, load(kTripsFile).data(),
                  config.bikes_allowed_default_);
   read_frequencies(trip_data, load(kFrequenciesFile).data());
   read_stop_times(tt, trip_data, stops, load(kStopTimesFile).data(),
                   shapes_data != nullptr);
-  load_fares(tt, str_cache, d, service, routes, stops);
-//   utl::verify(tt.fares_.size() == to_idx(src) + 1U, "fares: size={} src={}",
-//                           tt.fares_.size(), src);
+  {
+    std::unique_lock lock(mtx);
+    load_fares(tt, str_cache, d, service, routes, stops);
+  }
+  utl::verify(tt.fares_.size() == to_idx(src) + 1U, "fares: size={} src={}",
+              tt.fares_.size(), src);
 
   {
     auto const timer = scoped_timer{"loader.gtfs.trips.sort"};
@@ -187,6 +193,7 @@ void load_timetable(loader_config const& config,
 
   auto const add_trip = [&](std::basic_string<gtfs_trip_idx_t> const& trips,
                             bitfield const* traffic_days) {
+    std::unique_lock lock(mtx);
     expand_trip(
         trip_data, noon_offsets, tt, trips, traffic_days, tt.date_range_,
         assistance, [&](utc_trip&& s) {
@@ -334,19 +341,24 @@ void load_timetable(loader_config const& config,
             }
           }
 
-          tt.add_transport(timetable::transport{
-              .bitfield_idx_ = utl::get_or_create(
-                  bitfield_indices, s.utc_traffic_days_,
-                  [&]() { return tt.register_bitfield(s.utc_traffic_days_); }),
-              .route_idx_ = route_idx,
-              .first_dep_offset_ = s.first_dep_offset_,
-              .external_trip_ids_ = external_trip_ids,
-              .section_attributes_ = attributes,
-              .section_providers_ = {first.route_->agency_},
-              .section_directions_ = section_directions,
-              .section_lines_ = section_lines,
-              .stop_seq_numbers_ = stop_seq_numbers,
-              .route_colors_ = route_colors});
+          {
+            std::unique_lock lock(mtx);
+            tt.add_transport(timetable::transport{
+                .bitfield_idx_ = utl::get_or_create(
+                    bitfield_indices, s.utc_traffic_days_,
+                    [&]() {
+                      return tt.register_bitfield(s.utc_traffic_days_);
+                    }),
+                .route_idx_ = route_idx,
+                .first_dep_offset_ = s.first_dep_offset_,
+                .external_trip_ids_ = external_trip_ids,
+                .section_attributes_ = attributes,
+                .section_providers_ = {first.route_->agency_},
+                .section_directions_ = section_directions,
+                .section_lines_ = section_lines,
+                .stop_seq_numbers_ = stop_seq_numbers,
+                .route_colors_ = route_colors});
+          }
         }
 
         tt.finish_route();
@@ -373,6 +385,7 @@ void load_timetable(loader_config const& config,
     }
 
     if (shapes_data != nullptr) {
+      std::unique_lock lock(mtx);
       calculate_shape_offsets_and_bboxes(tt, *shapes_data, shape_states,
                                          trip_data.data_);
     }
@@ -388,6 +401,33 @@ void load_timetable(loader_config const& config,
       tt.trip_transport_ranges_.emplace_back(t.transport_ranges_);
     }
   }
+}
+
+void load_timetable(loader_config const& config,
+                    source_idx_t const src,
+                    dir const& d,
+                    timetable& tt,
+                    hash_map<bitfield, bitfield_idx_t>& bitfield_indices,
+                    string_cache_t& str_cache,
+                    assistance_times* assistance,
+                    shapes_storage* shapes_data) {
+  std::mutex mtx;
+  load_timetable_impl(config, src, d, tt, bitfield_indices, str_cache,
+                      assistance, shapes_data, mtx);
+}
+
+void load_timetable_threadsafe(
+    loader_config const& config,
+    source_idx_t const src,
+    dir const& d,
+    timetable& tt,
+    hash_map<bitfield, bitfield_idx_t>& bitfield_indices,
+    string_cache_t& str_cache,
+    assistance_times* assistance,
+    shapes_storage* shapes_data,
+    std::mutex& mtx) {
+  load_timetable_impl(config, src, d, tt, bitfield_indices, str_cache,
+                      assistance, shapes_data, mtx);
 }
 
 }  // namespace nigiri::loader::gtfs

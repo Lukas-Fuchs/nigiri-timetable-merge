@@ -6,8 +6,6 @@
 #include "nigiri/timetable.h"
 #include "utl/enumerate.h"
 
-#include "../thirdparty/tracy/public/tracy/Tracy.hpp"
-
 namespace nigiri::loader::gtfs {
 
 using nigiri::timetable;
@@ -233,13 +231,9 @@ private:
 };
 
 void merge_tables(timetable& lhs, timetable&& rhs, string_cache_t& str_cache) {
-  ZoneScoped;
   idx_offsets ofs(lhs, rhs, str_cache);
 
-  // TODO: date_range_
-
-  // TODO: locations_, transport and other composite members that might need
-  // their indices corrected
+  assert(lhs.date_range_ == rhs.date_range_);
 
   ofs.merge_hashmap<location_id, location_idx_t>(
       lhs.locations_.location_id_to_idx_,
