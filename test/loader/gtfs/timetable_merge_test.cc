@@ -98,7 +98,7 @@ static timetable load_parallel(
   interval<date::sys_days> date_range{date::sys_days{2024_y / March / 1},
                                       date::sys_days{2025_y / March / 2}};
 
-  return serial_load(paths, {}, date_range, nullptr, nullptr, false);
+  return parallel_load(paths, {}, date_range, nullptr, nullptr, false);
 }
 
 static void compare_serial_parallel(
@@ -107,7 +107,8 @@ static void compare_serial_parallel(
   auto tt_serial = load_serial(paths);
   auto tt_parallel = load_parallel(paths);
 
-  verify_timetable_sizes(tt_serial, tt_parallel);
+  verify_timetable_sizes(tt_parallel, tt_serial);
+  ASSERT_TRUE(compare_timetables(tt_parallel, tt_serial));
   ASSERT_TRUE(compare_timetables(tt_serial, tt_parallel));
 }
 
@@ -121,6 +122,7 @@ TEST(gtfs, merge_single_timetable) {
 // Tests that merging two timetables generally works.
 TEST(gtfs, merge_multiple_timetables) {
   compare_serial_parallel({testdata::example, testdata::berlin});
+  compare_serial_parallel({testdata::berlin, testdata::example});
 }
 
 // Tests that each constituent timetable is contained in (a subset of) the
