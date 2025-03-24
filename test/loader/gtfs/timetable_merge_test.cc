@@ -125,7 +125,7 @@ TEST(gtfs, merge_multiple_timetables) {
   compare_serial_parallel({testdata::berlin, testdata::example});
 }
 
-// Tests that each constituent timetable is contained in (a subset of) the
+// Tests that each constituent timetable is contained in the
 // merged table.
 TEST(gtfs, merge_subset_relation) {
   auto tt1 = load_parallel({testdata::example});

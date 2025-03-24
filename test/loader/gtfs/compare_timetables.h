@@ -208,42 +208,143 @@ private:
   }
 
   bool check_relations() const {
-    for (auto const& [l, r] : location_map_) {
-      auto const& l_routes = lhs_.location_routes_[l];
-      auto const& r_routes = rhs_.location_routes_[r];
-      if (l_routes.size() != r_routes.size()) {
-        std::cout << "Tables have different number of routes for location "
-                  << lhs_.locations_.names_[l].view() << ": " << l_routes.size()
-                  << " != " << r_routes.size() << "\n";
+    ///////////////// Trip Features /////////////////
+
+    for (auto const& [l, r] : trip_map_) {
+      if (lhs_.trip_ids_[l].size() != rhs_.trip_ids_[r].size()) {
+        std::cout << "Mismatching number of external trip IDs.\n";
         return false;
       }
 
+      for (auto const& [l_stop, r_stop] :
+           utl::zip(lhs_.trip_stop_seq_numbers_[l],
+                    rhs_.trip_stop_seq_numbers_[r])) {
+        if (l_stop != r_stop) {
+          std::cout << "Mismatching trip stop sequences.\n ";
+          return false;
+        }
+      }
+
+      for (auto const& [l_debug, r_debug] :
+           utl::zip(lhs_.trip_debug_[l], rhs_.trip_debug_[r])) {
+        std::cout << lhs_.source_file_names_[l_debug.source_file_idx_].view()
+                  << " ";
+        std::cout << rhs_.source_file_names_[r_debug.source_file_idx_].view()
+                  << "\n";
+        if (source_file_map_.at(l_debug.source_file_idx_) !=
+            r_debug.source_file_idx_) {
+          std::cout << "Mismatching source file index: "
+                    << source_file_map_.at(l_debug.source_file_idx_)
+                    << " != " << r_debug.source_file_idx_ << "\n";
+        }
+
+        if ((r_debug.source_file_idx_ !=
+             source_file_map_.at(l_debug.source_file_idx_)) ||
+            (r_debug.line_number_from_ != l_debug.line_number_from_) ||
+            (r_debug.line_number_to_ != l_debug.line_number_to_)) {
+          std::cout << "Mismatching debugging information for trip "
+                    << lhs_.trip_display_names_[l].view() << ".\n";
+          std::cout << " - File: "
+                    << lhs_.source_file_names_[l_debug.source_file_idx_].view()
+                    << "(" << l_debug.source_file_idx_ << ")" << "\t|\t"
+                    << rhs_.source_file_names_[r_debug.source_file_idx_].view()
+                    << "(" << r_debug.source_file_idx_ << "/"
+                    << source_file_map_.at(l_debug.source_file_idx_) << ")"
+                    << "\n";
+          std::cout << " - Lines: " << l_debug.line_number_from_ << "-"
+                    << l_debug.line_number_to_ << "\t|\t"
+                    << r_debug.line_number_from_ << "-"
+                    << r_debug.line_number_to_ << std::endl;
+          return false;
+        }
+      }
+
+      if (lhs_.trip_display_names_[l].view() !=
+          rhs_.trip_display_names_[r].view()) {
+        std::cout << "Mismatching trip display names.\n";
+        return false;
+      }
+    }
+
+    ///////////////// Route Features /////////////////
+    for (auto const& [l, r] : route_map_) {
+
+      {
+        auto const& l_transport = lhs_.route_transport_ranges_[l];
+        auto const& r_transport = rhs_.route_transport_ranges_[r];
+        if ((r_transport.from_ != transport_map_.at(l_transport.from_)) ||
+            (r_transport.to_ != transport_map_.at(l_transport.to_))) {
+          std::cout << "Mismatching route transport ranges.\n";
+          return false;
+        }
+      }
+
+      for (auto const& [l_stop, r_stop] :
+           utl::zip(lhs_.route_location_seq_[l], rhs_.route_location_seq_[r])) {
+        if (l_stop != r_stop) {
+          std::cout << "Mismatching route stop sequences.\n";
+          return false;
+        }
+      }
+
+      if (lhs_.route_clasz_[l] != rhs_.route_clasz_[r]) {
+        std::cout << "Mismatching route clasz.\n";
+        return false;
+      }
+
+      for (auto const& [l_clasz, r_clasz] : utl::zip(
+               lhs_.route_section_clasz_[l], rhs_.route_section_clasz_[r])) {
+        if (l_clasz != r_clasz) {
+          std::cout << "Mismatching route section clasz.\n";
+          return false;
+        }
+      }
+
+      {
+        uint32_t const l_bike_idx(l * 2);
+        uint32_t const r_bike_idx(r * 2);
+        if (lhs_.route_bikes_allowed_.test(l_bike_idx) !=
+            rhs_.route_bikes_allowed_.test(r_bike_idx)) {
+          std::cout << "Mismatching route bikes allowed.\n";
+          return false;
+        }
+
+        if (lhs_.route_bikes_allowed_.test(l_bike_idx + 1) !=
+            rhs_.route_bikes_allowed_.test(r_bike_idx + 1)) {
+          std::cout
+              << "Mismatching route bikes allowed route/section policy.\n";
+          return false;
+        }
+
+        if (lhs_.route_bikes_allowed_.test(l_bike_idx + 1)) {
+          for (auto const& [l_bike, r_bike] :
+               utl::zip(lhs_.route_bikes_allowed_per_section_[l],
+                        rhs_.route_bikes_allowed_per_section_[r])) {
+            if (l_bike != r_bike) {
+              std::cout << "Mismatching bike section in route.\n";
+              return false;
+            }
+          }
+        }
+      }
+
+      if (lhs_.route_stop_time_ranges_[l] != rhs_.route_stop_time_ranges_[r]) {
+        std::cout << "Mismatching route stop time ranges.\n";
+        return false;
+      }
+    }
+
+    ///////////////// Location Features /////////////////
+
+    for (auto const& [l, r] : location_map_) {
+      auto const& l_routes = lhs_.location_routes_[l];
+      auto const& r_routes = rhs_.location_routes_[r];
       for (auto const& [l_route, r_route] : utl::zip(l_routes, r_routes)) {
         if (route_map_.at(l_route) != r_route) {
           std::cout << "Mismatching routes for location "
                     << lhs_.locations_.names_[l].view() << "\n";
           return false;
         }
-      }
-    }
-
-    for (size_t i = 0; i < lhs_.trip_stop_seq_numbers_.size(); ++i) {
-      trip_idx_t idx(i);
-      auto const& l_stops = lhs_.trip_stop_seq_numbers_[idx];
-      auto const& r_stops = rhs_.trip_stop_seq_numbers_[trip_map_.at(idx)];
-
-      for (auto const& [l, r] : utl::zip(l_stops, r_stops)) {
-        if (l != r) {
-          std::cout << "Mismatching stop sequences.\n ";
-          return false;
-        }
-      }
-    }
-
-    for (auto const& [l, r] : trip_map_) {
-      if (lhs_.trip_ids_[l].size() != rhs_.trip_ids_[r].size()) {
-        std::cout << "Mismatching number of external trip IDs.\n";
-        return false;
       }
     }
 
