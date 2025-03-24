@@ -69,26 +69,6 @@ private:
       }
     }
 
-    ///////////////// TRIPS /////////////////
-    {
-      bool const success = map_leaves<trip_idx_t>(
-          lhs_.trip_display_names_.size(), rhs_.trip_display_names_.size(),
-          [&](trip_idx_t const l, trip_idx_t const r) {
-            return lhs_.trip_display_names_[l].view() ==
-                   rhs_.trip_display_names_[r].view();
-          },
-          [&](trip_idx_t const l, trip_idx_t const r) { trip_map_[l] = r; },
-          [&](trip_idx_t const l) {
-            std::cout << "Trip " << lhs_.trip_display_names_[l].view()
-                      << " is missing in right hand table\n";
-          });
-
-      if (!success) {
-        std::cout << "Table mismatch: Trips\n";
-        return false;
-      }
-    }
-
     ///////////////// TRIP IDS /////////////////
     {
       bool const success = map_leaves<trip_id_idx_t>(
@@ -110,6 +90,27 @@ private:
 
       if (!success) {
         std::cout << "Table mismatch: Trip IDs\n";
+        return false;
+      }
+    }
+
+    ///////////////// TRIPS /////////////////
+    {
+      bool const success = map_leaves<trip_idx_t>(
+          lhs_.trip_ids_.size(), rhs_.trip_ids_.size(),
+          [&](trip_idx_t const l, trip_idx_t const r) -> bool {
+            return !lhs_.trip_ids_[l].empty() && !rhs_.trip_ids_[r].empty() &&
+                   trip_id_map_.at(lhs_.trip_ids_[l].front()) ==
+                       rhs_.trip_ids_[r].front();
+          },
+          [&](trip_idx_t const l, trip_idx_t const r) { trip_map_[l] = r; },
+          [&](trip_idx_t const l) {
+            std::cout << "Trip " << lhs_.trip_display_names_[l].view()
+                      << " is missing in right hand table\n";
+          });
+
+      if (!success) {
+        std::cout << "Table mismatch: Trips\n";
         return false;
       }
     }
