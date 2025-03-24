@@ -96,7 +96,8 @@ loader::mem_dir example_files() {
        {path{kFrequenciesFile}, std::string{example_frequencies_file_content}},
        {path{kShapesFile}, std::string{example_shapes_file_content}},
        {path{kTripsFile}, std::string{example_trips_file_content}},
-       {path{kStopTimesFile}, std::string{example_stop_times_content}}}};
+       {path{kStopTimesFile}, std::string{example_stop_times_content}}},
+      "example"};
 }
 
 constexpr auto const berlin_agencies_file_content = std::string_view{
@@ -195,7 +196,8 @@ loader::mem_dir berlin_files() {
            {path{kRoutesFile}, std::string{berlin_routes_file_content}},
            {path{kShapesFile}, std::string{berlin_shapes_file_content}},
            {path{kTripsFile}, std::string{berlin_trips_file_content}},
-           {path{kStopTimesFile}, std::string{berlin_stop_times_content}}}};
+           {path{kStopTimesFile}, std::string{berlin_stop_times_content}}},
+          "berlin"};
 }
 
 }  // namespace nigiri::loader::gtfs

@@ -77,6 +77,7 @@ struct mem_dir final : public dir {
   using dir_t = std::map<std::filesystem::path, std::string>;
   static mem_dir read(std::string_view);
   mem_dir(dir_t);
+  mem_dir(dir_t, std::string);
   ~mem_dir() final;
   mem_dir(mem_dir const&);
   mem_dir(mem_dir&&) noexcept;
@@ -92,6 +93,7 @@ struct mem_dir final : public dir {
   std::uint64_t hash() const final;
   std::string get_content() const;
   dir_t dir_;
+  std::string name_;
 };
 
 std::unique_ptr<dir> make_dir(std::filesystem::path const& p);

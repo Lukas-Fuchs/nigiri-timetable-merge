@@ -243,6 +243,8 @@ std::uint64_t zip_dir::hash() const {
 
 // --- In-memory directory implementation ---
 mem_dir::mem_dir(dir_t d) : dir{"::memory::"}, dir_{std::move(d)} {}
+mem_dir::mem_dir(dir_t d, std::string name)
+    : dir{"::memory::/" + name}, dir_{std::move(d)}, name_(name) {}
 mem_dir::~mem_dir() = default;
 mem_dir::mem_dir(mem_dir const&) = default;
 mem_dir::mem_dir(mem_dir&&) noexcept = default;
@@ -306,7 +308,12 @@ mem_dir mem_dir::read(std::string_view s) {
   std::string_view file_name;
   char const* file_content_begin = nullptr;
   auto dir = mem_dir::dir_t{};
+  std::string dir_name;
   utl::for_each_line(s, [&](utl::cstr const line) {
+    if (line.starts_with("##")) {
+      dir_name = line.substr(2).trim().to_str();
+      return;
+    }
     if (line.starts_with("#")) {
       if (file_content_begin != nullptr) {
         auto const length =
@@ -322,11 +329,18 @@ mem_dir mem_dir::read(std::string_view s) {
         static_cast<std::size_t>(s.data() + s.size() - file_content_begin);
     dir.emplace(file_name, std::string{file_content_begin, length});
   }
+
+  if (!dir_name.empty()) {
+    return {dir, dir_name};
+  }
   return {dir};
 }
 
 std::string mem_dir::get_content() const {
   std::string s = "\n";
+  if (!name_.empty()) {
+    s += fmt::format("##{}\n", name_);
+  }
   for (auto const& [path, content] : dir_) {
     s += fmt::format("#{}\n{}\n", path.string(), content);
   }
