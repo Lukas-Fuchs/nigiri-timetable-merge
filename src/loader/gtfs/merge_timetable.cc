@@ -72,6 +72,7 @@ struct idx_offsets {
   void correct_idx(provider_idx_t& idx) const { idx += provider_offset; }
   void correct_idx(area_idx_t& idx) const { idx += area_offset; }
 
+  uint32_t correct(uint32_t const a) const { return a; }
   string correct(string const& a) const { return a; }
   route_color correct(route_color const& a) const { return a; }
   bitfield correct(bitfield const& a) const { return a; }
@@ -118,8 +119,14 @@ struct idx_offsets {
   }
 
   template <typename T>
+  interval<T> correct(interval<T> ival) const {
+    return {correct(ival.from_), correct(ival.to_)};
+  }
+
+  template <typename T>
     requires requires(T& t, idx_offsets const ofs) { ofs.correct_idx(t); }
   T correct(T idx) const {
+    if (idx == T::invalid()) return idx;
     T new_idx = idx;
     correct_idx(new_idx);
     return new_idx;
@@ -194,10 +201,17 @@ struct idx_offsets {
   }
 
   template <typename K, typename V>
-  void merge_hashmap(hash_map<K, V>& lhs, hash_map<K, V>&& rhs) const {
+  size_t merge_hashmap(hash_map<K, V>& lhs, hash_map<K, V>&& rhs) const {
+    size_t n_duplicates = 0;
     for (auto&& [k, v] : rhs) {
-      lhs.emplace(correct(k), correct(std::move(v)));
+      auto const new_k = correct(k);
+      if (lhs.find(new_k) == lhs.end()) {
+        lhs.emplace(new_k, correct(std::move(v)));
+      } else {
+        ++n_duplicates;
+      }
     }
+    return n_duplicates;
   }
 
   void merge_bitvec(bitvec& lhs, bitvec const& rhs) const {
@@ -235,9 +249,16 @@ void merge_tables(timetable& lhs, timetable&& rhs, string_cache_t& str_cache) {
 
   assert(lhs.date_range_ == rhs.date_range_);
 
-  ofs.merge_hashmap<location_id, location_idx_t>(
-      lhs.locations_.location_id_to_idx_,
-      std::move(rhs.locations_.location_id_to_idx_));
+  {
+    auto const n_duplicates = ofs.merge_hashmap<location_id, location_idx_t>(
+        lhs.locations_.location_id_to_idx_,
+        std::move(rhs.locations_.location_id_to_idx_));
+
+    if (n_duplicates) {
+      log(log_lvl::error, "merge_tables",
+          "merge skipped {} duplicate stations.", n_duplicates);
+    }
+  }
 
   ofs.merge_vecvec<location_idx_t, char>(lhs.locations_.names_,
                                          std::move(rhs.locations_.names_));

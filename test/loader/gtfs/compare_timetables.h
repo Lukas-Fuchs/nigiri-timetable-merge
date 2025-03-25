@@ -43,32 +43,6 @@ private:
   }
 
   bool create_mappings() {
-    ///////////////// LOCATIONS /////////////////
-    {
-      bool const success = map_leaves<location_idx_t>(
-          lhs_.locations_.names_.size(), rhs_.locations_.names_.size(),
-          [&](location_idx_t const l, location_idx_t const r) {
-            return (lhs_.locations_.names_[l].view() ==
-                    rhs_.locations_.names_[r].view())  //
-                   &&  //
-                   (lhs_.locations_.ids_[l].view() ==
-                    rhs_.locations_.ids_[r].view());
-          },
-          [&](location_idx_t const l, location_idx_t const r) {
-            location_map_[l] = r;
-          },
-          [&](location_idx_t const l) {
-            std::cout << "Location " << lhs_.locations_.names_[l].view() << " ("
-                      << lhs_.locations_.ids_[l].view()
-                      << ") is missing in right hand table\n";
-          });
-
-      if (!success) {
-        std::cout << "Table mismatch: Locations\n";
-        return false;
-      }
-    }
-
     ///////////////// TRIP IDS /////////////////
     {
       bool const success = map_leaves<trip_id_idx_t>(
@@ -115,11 +89,6 @@ private:
       }
     }
 
-    ///////////////// ROUTE IDS /////////////////
-    for (auto const& [l, r] : trip_map_) {
-      route_id_map_[lhs_.trip_route_id_[l]] = rhs_.trip_route_id_[r];
-    }
-
     ///////////////// SOURCES /////////////////
     for (auto const& [l, r] : trip_id_map_) {
       source_map_[lhs_.trip_id_src_[l]] = rhs_.trip_id_src_[r];
@@ -145,6 +114,38 @@ private:
         std::cout << "Table mismatch: Source files\n";
         return false;
       }
+    }
+
+    ///////////////// LOCATIONS /////////////////
+    {
+      bool success = true;
+      for (auto const& [l_id, l] : lhs_.locations_.location_id_to_idx_) {
+        // Special stations use the invalid index, which does not map to a file.
+        auto const r_src = l_id.src_ != source_idx_t::invalid()
+                               ? source_map_.at(l_id.src_)
+                               : l_id.src_;
+
+        location_id r_id{.id_ = l_id.id_, .src_ = r_src};
+        auto const it_r = rhs_.locations_.location_id_to_idx_.find(r_id);
+        if (it_r == rhs_.locations_.location_id_to_idx_.end()) {
+          std::cout << "Location " << lhs_.locations_.names_[l].view()
+                    << " (source index " << l_id.src_
+                    << ") is missing in right hand table\n";
+          success = false;
+          break;
+        }
+        location_map_[l] = it_r->second;
+      }
+
+      if (!success) {
+        std::cout << "Table mismatch: Locations\n";
+        return false;
+      }
+    }
+
+    ///////////////// ROUTE IDS /////////////////
+    for (auto const& [l, r] : trip_map_) {
+      route_id_map_[lhs_.trip_route_id_[l]] = rhs_.trip_route_id_[r];
     }
 
     ///////////////// PROVIDERS /////////////////
@@ -227,10 +228,6 @@ private:
 
       for (auto const& [l_debug, r_debug] :
            utl::zip(lhs_.trip_debug_[l], rhs_.trip_debug_[r])) {
-        std::cout << lhs_.source_file_names_[l_debug.source_file_idx_].view()
-                  << " ";
-        std::cout << rhs_.source_file_names_[r_debug.source_file_idx_].view()
-                  << "\n";
         if (source_file_map_.at(l_debug.source_file_idx_) !=
             r_debug.source_file_idx_) {
           std::cout << "Mismatching source file index: "
@@ -337,15 +334,20 @@ private:
     ///////////////// Location Features /////////////////
 
     for (auto const& [l, r] : location_map_) {
-      auto const& l_routes = lhs_.location_routes_[l];
-      auto const& r_routes = rhs_.location_routes_[r];
-      for (auto const& [l_route, r_route] : utl::zip(l_routes, r_routes)) {
+      for (auto const& [l_route, r_route] :
+           utl::zip(lhs_.location_routes_[l], rhs_.location_routes_[r])) {
         if (route_map_.at(l_route) != r_route) {
           std::cout << "Mismatching routes for location "
                     << lhs_.locations_.names_[l].view() << "\n";
           return false;
         }
       }
+
+      // Anything related to footpaths is either created or deleted during
+      // finalization and may not be a perfect combination of the constituents.
+      // Footpaths are therefore ignored for now.
+      // TODO: Maybe perform the Dijkstra test on merged tables to verify the
+      // correctness of search graphs.
     }
 
     return true;
