@@ -5,7 +5,6 @@
 #include <functional>
 #include <iostream>
 #include <unordered_map>
-#include <variant>
 
 #include "nigiri/timetable.h"
 #include "utl/enumerate.h"
@@ -93,6 +92,7 @@ private:
     for (auto const& [l, r] : trip_id_map_) {
       source_map_[lhs_.trip_id_src_[l]] = rhs_.trip_id_src_[r];
     }
+    source_map_[source_idx_t::invalid()] = source_idx_t::invalid();
 
     ///////////////// SOURCE FILES /////////////////
     {
@@ -120,12 +120,8 @@ private:
     {
       bool success = true;
       for (auto const& [l_id, l] : lhs_.locations_.location_id_to_idx_) {
-        // Special stations use the invalid index, which does not map to a file.
-        auto const r_src = l_id.src_ != source_idx_t::invalid()
-                               ? source_map_.at(l_id.src_)
-                               : l_id.src_;
 
-        location_id r_id{.id_ = l_id.id_, .src_ = r_src};
+        location_id r_id{.id_ = l_id.id_, .src_ = source_map_.at(l_id.src_)};
         auto const it_r = rhs_.locations_.location_id_to_idx_.find(r_id);
         if (it_r == rhs_.locations_.location_id_to_idx_.end()) {
           std::cout << "Location " << lhs_.locations_.names_[l].view()
@@ -175,17 +171,29 @@ private:
     }
 
     ///////////////// TRANSPORTS /////////////////
-    // This mapping is build according to references from other index types and
+    // This mapping is built according to references from other index types and
     // will be verified later.
-    for (auto const& [l, r] : trip_map_) {
-      // NOTE: This only works under the assumption that the transport indices
-      // are always in the same order, which is the case as long as there is no
-      // concurrency within individual files' loading routines. If this fails
-      // due to order mismatches, that might be the reason.
-      for (auto const& [l_transport, r_transport] :
-           utl::zip(lhs_.trip_transport_ranges_[l],
-                    rhs_.trip_transport_ranges_[r])) {
-        transport_map_[l_transport.first] = r_transport.first;
+    {
+      bool const success = map_leaves<transport_idx_t>(
+          lhs_.transport_traffic_days_.size(),
+          rhs_.transport_traffic_days_.size(),
+          [&](transport_idx_t l, transport_idx_t r) {
+            auto const l_dbg = lhs_.dbg(l);
+            auto const r_dbg = rhs_.dbg(r);
+            return l_dbg.path_ == r_dbg.path_ &&
+                   l_dbg.line_from_ == r_dbg.line_from_ &&
+                   l_dbg.line_to_ == r_dbg.line_to_;
+          },
+          [&](transport_idx_t l, transport_idx_t r) { transport_map_[l] = r; },
+          [&](transport_idx_t const l) {
+            auto const l_dbg = lhs_.dbg(l);
+            std::cout << "Transport at " << l_dbg.path_ << ", L."
+                      << l_dbg.line_from_ << "-" << l_dbg.line_to_
+                      << " is missing in right hand table\n";
+          });
+
+      if (!success) {
+        return false;
       }
     }
 
@@ -334,6 +342,99 @@ private:
     ///////////////// Location Features /////////////////
 
     for (auto const& [l, r] : location_map_) {
+
+      if (lhs_.locations_.names_[l].view() !=
+          rhs_.locations_.names_[r].view()) {
+        std::cout << "Mismatching location names: "
+                  << lhs_.locations_.names_[l].view()
+                  << " != " << rhs_.locations_.names_[r].view() << "\n";
+        return false;
+      }
+
+      if (lhs_.locations_.ids_[l].view() != rhs_.locations_.ids_[r].view()) {
+        std::cout << "Mismatching location IDs: "
+                  << lhs_.locations_.ids_[l].view()
+                  << " != " << rhs_.locations_.ids_[r].view() << "\n";
+        return false;
+      }
+
+      if (lhs_.locations_.coordinates_[l] != rhs_.locations_.coordinates_[r]) {
+        std::cout << "Mismatching location coordinates";
+        return false;
+      }
+
+      if (source_map_.at(lhs_.locations_.src_[l]) != rhs_.locations_.src_[r]) {
+        std::cout << "Mismatching location sources";
+        return false;
+      }
+
+      if (lhs_.locations_.transfer_time_[l] !=
+          rhs_.locations_.transfer_time_[r]) {
+        std::cout << "Mismatching location transfer times";
+        return false;
+      }
+
+      if (lhs_.locations_.types_[l] != rhs_.locations_.types_[r]) {
+        std::cout << "Mismatching location types";
+        return false;
+      }
+
+      auto const tz_name = [](timetable const& tt,
+                              location_idx_t loc) -> string {
+        auto const tz_idx = tt.locations_.location_timezones_[loc];
+        if (tz_idx == timezone_idx_t::invalid()) {
+          // These are permitted so this causing the test to pass is fine.
+          return "<INVALID>";
+        }
+        auto const& tz = tt.locations_.timezones_[tz_idx];
+        if (!holds_alternative<pair<string, void const*>>(tz)) {
+          throw std::runtime_error("Unexpected timezone type");
+        }
+        return tz.as<pair<string, void const*>>().first;
+      };
+
+      if (tz_name(lhs_, l) != tz_name(rhs_, r)) {
+        std::cout << "Mismatching location time zones";
+        return false;
+      }
+
+      for (auto const& [l_eq, r_eq] :
+           utl::zip(lhs_.locations_.equivalences_[l],
+                    rhs_.locations_.equivalences_[r])) {
+        if (r_eq != location_map_.at(l_eq)) {
+          std::cout << "Mismatching location equivalences" << std::endl;
+          return false;
+        }
+      }
+
+      for (auto const& [l_child, r_child] : utl::zip(
+               lhs_.locations_.children_[l], rhs_.locations_.children_[r])) {
+        if (r_child != location_map_.at(l_child)) {
+          std::cout << "Child mismatch for location "
+                    << lhs_.locations_.names_[l].view() << ": "
+                    << lhs_.locations_.names_[l_child].view()
+                    << " != " << lhs_.locations_.names_[r_child].view() << "\n";
+          return false;
+        }
+
+        auto check_parent_child_relation = [&](timetable const& tt,
+                                               location_idx_t parent,
+                                               location_idx_t child) -> bool {
+          if (tt.locations_.parents_[child] != parent) {
+            std::cout << "Asymmetric location parent->child relation: "
+                      << tt.locations_.names_[parent].view() << " -> "
+                      << lhs_.locations_.names_[l].view() << "\n";
+            return false;
+          }
+          return true;
+        };
+
+        if (!check_parent_child_relation(lhs_, l, l_child) ||
+            !check_parent_child_relation(rhs_, r, r_child)) {
+          return false;
+        }
+      }
+
       for (auto const& [l_route, r_route] :
            utl::zip(lhs_.location_routes_[l], rhs_.location_routes_[r])) {
         if (route_map_.at(l_route) != r_route) {
