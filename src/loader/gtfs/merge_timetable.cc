@@ -20,9 +20,19 @@ struct idx_offsets {
   using idx_offset_t = int64_t;
   idx_offsets(timetable& tt,
               timetable const& other,
-              string_cache_t& str_cache) {
-    for (auto const& s : other.strings_.strings_) {
-      string_map.emplace_back(tt.strings_.register_string(str_cache, s.view()));
+              string_cache_t& str_cache,
+              std::mutex* cache_mutex) {
+    auto const map_strings = [&]() {
+      for (auto const& s : other.strings_.strings_) {
+        string_map.emplace_back(
+            tt.strings_.register_string(str_cache, s.view()));
+      }
+    };
+    if (cache_mutex) {
+      std::lock_guard g(*cache_mutex);
+      map_strings();
+    } else {
+      map_strings();
     }
     bitfield_offset = tt.bitfields_.size();
     location_offset = tt.n_locations();
@@ -151,12 +161,6 @@ struct idx_offsets {
     return i;
   }
 
-  /*template <typename T>
-  T correct(T) const {
-    static_assert(false, "No overload of 'correct' found for this type.");
-    return {};
-  }*/
-
   // Merge functions
 
   template <typename T>
@@ -244,8 +248,13 @@ private:
   idx_offset_t area_offset{0};
 };
 
-void merge_tables(timetable& lhs, timetable&& rhs, string_cache_t& str_cache) {
-  idx_offsets ofs(lhs, rhs, str_cache);
+void merge_tables(timetable& lhs,
+                  timetable&& rhs,
+                  string_cache_t& str_cache,
+                  std::mutex* cache_mutex) {
+  ZoneScopedC(0x0000FF);
+
+  idx_offsets ofs(lhs, rhs, str_cache, cache_mutex);
 
   assert(lhs.date_range_ == rhs.date_range_);
 
