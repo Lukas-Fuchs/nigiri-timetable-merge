@@ -252,7 +252,6 @@ void merge_tables(timetable& lhs,
                   timetable&& rhs,
                   string_cache_t& str_cache,
                   std::mutex* cache_mutex) {
-  ZoneScopedC(0x0000FF);
 
   idx_offsets ofs(lhs, rhs, str_cache, cache_mutex);
 
