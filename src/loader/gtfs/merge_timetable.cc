@@ -16,12 +16,12 @@ concept Iterable = requires(V v) {
   v.end();
 };
 
-struct idx_offsets {
+struct index_manager {
   using idx_offset_t = int64_t;
-  idx_offsets(timetable& tt,
-              timetable const& other,
-              string_cache_t& str_cache,
-              std::mutex* cache_mutex) {
+  index_manager(timetable& tt,
+                timetable const& other,
+                string_cache_t& str_cache,
+                std::mutex* cache_mutex) {
     auto const map_strings = [&]() {
       for (auto const& s : other.strings_.strings_) {
         string_map.emplace_back(
@@ -34,53 +34,53 @@ struct idx_offsets {
     } else {
       map_strings();
     }
-    bitfield_offset = tt.bitfields_.size();
-    location_offset = tt.n_locations();
-    route_offset = tt.n_routes();
-    route_id_offset = idx_offset_t(uint32_t(tt.next_route_id_idx_));
-    transport_offset = tt.transport_traffic_days_.size();
-    merged_trips_offset = tt.merged_trips_.size();
-    timezone_offset = tt.locations_.timezones_.size();
-    source_offset = tt.fares_.size();
-    source_file_offset = tt.source_file_names_.size();
-    trip_offset = tt.trip_ids_.size();
-    trip_id_offset = tt.trip_id_strings_.size();
-    trip_direction_offset = tt.trip_directions_.size();
-    trip_direction_string_offset = tt.trip_direction_strings_.size();
-    trip_line_offset = tt.trip_lines_.size();
-    attribute_offset = tt.attributes_.size();
-    attribute_combination_offset = tt.attribute_combinations_.size();
-    provider_offset = tt.providers_.size();
-    area_offset = tt.areas_.size();
+    bitfield_offset_ = tt.bitfields_.size();
+    location_offset_ = tt.n_locations();
+    route_offset_ = tt.n_routes();
+    route_id_offset_ = idx_offset_t(uint32_t(tt.next_route_id_idx_));
+    transport_offset_ = tt.transport_traffic_days_.size();
+    merged_trips_offset_ = tt.merged_trips_.size();
+    timezone_offset_ = tt.locations_.timezones_.size();
+    source_offset_ = tt.fares_.size();
+    source_file_offset_ = tt.source_file_names_.size();
+    trip_offset_ = tt.trip_ids_.size();
+    trip_id_offset_ = tt.trip_id_strings_.size();
+    trip_direction_offset_ = tt.trip_directions_.size();
+    trip_direction_string_offset_ = tt.trip_direction_strings_.size();
+    trip_line_offset_ = tt.trip_lines_.size();
+    attribute_offset_ = tt.attributes_.size();
+    attribute_combination_offset_ = tt.attribute_combinations_.size();
+    provider_offset_ = tt.providers_.size();
+    area_offset_ = tt.areas_.size();
   }
 
   void correct_idx(string_idx_t& idx) const { idx = string_map[idx]; }
-  void correct_idx(bitfield_idx_t& idx) const { idx += bitfield_offset; }
-  void correct_idx(location_idx_t& idx) const { idx += location_offset; }
-  void correct_idx(route_idx_t& idx) const { idx += route_offset; }
-  void correct_idx(route_id_idx_t& idx) const { idx += route_id_offset; }
-  void correct_idx(transport_idx_t& idx) const { idx += transport_offset; }
+  void correct_idx(bitfield_idx_t& idx) const { idx += bitfield_offset_; }
+  void correct_idx(location_idx_t& idx) const { idx += location_offset_; }
+  void correct_idx(route_idx_t& idx) const { idx += route_offset_; }
+  void correct_idx(route_id_idx_t& idx) const { idx += route_id_offset_; }
+  void correct_idx(transport_idx_t& idx) const { idx += transport_offset_; }
   void correct_idx(merged_trips_idx_t& idx) const {
-    idx += merged_trips_offset;
+    idx += merged_trips_offset_;
   }
-  void correct_idx(timezone_idx_t& idx) const { idx += timezone_offset; }
-  void correct_idx(source_idx_t& idx) const { idx += source_offset; }
-  void correct_idx(source_file_idx_t& idx) const { idx += source_file_offset; }
-  void correct_idx(trip_idx_t& idx) const { idx += trip_offset; }
-  void correct_idx(trip_id_idx_t& idx) const { idx += trip_id_offset; }
+  void correct_idx(timezone_idx_t& idx) const { idx += timezone_offset_; }
+  void correct_idx(source_idx_t& idx) const { idx += source_offset_; }
+  void correct_idx(source_file_idx_t& idx) const { idx += source_file_offset_; }
+  void correct_idx(trip_idx_t& idx) const { idx += trip_offset_; }
+  void correct_idx(trip_id_idx_t& idx) const { idx += trip_id_offset_; }
   void correct_idx(trip_direction_idx_t& idx) const {
-    idx += trip_direction_offset;
+    idx += trip_direction_offset_;
   }
   void correct_idx(trip_direction_string_idx_t& idx) const {
-    idx += trip_direction_string_offset;
+    idx += trip_direction_string_offset_;
   }
-  void correct_idx(trip_line_idx_t& idx) const { idx += trip_line_offset; }
-  void correct_idx(attribute_idx_t& idx) const { idx += attribute_offset; }
+  void correct_idx(trip_line_idx_t& idx) const { idx += trip_line_offset_; }
+  void correct_idx(attribute_idx_t& idx) const { idx += attribute_offset_; }
   void correct_idx(attribute_combination_idx_t& idx) const {
-    idx += attribute_combination_offset;
+    idx += attribute_combination_offset_;
   }
-  void correct_idx(provider_idx_t& idx) const { idx += provider_offset; }
-  void correct_idx(area_idx_t& idx) const { idx += area_offset; }
+  void correct_idx(provider_idx_t& idx) const { idx += provider_offset_; }
+  void correct_idx(area_idx_t& idx) const { idx += area_offset_; }
 
   uint32_t correct(uint32_t const a) const { return a; }
   string correct(string const& a) const { return a; }
@@ -134,7 +134,7 @@ struct idx_offsets {
   }
 
   template <typename T>
-    requires requires(T& t, idx_offsets const ofs) { ofs.correct_idx(t); }
+    requires requires(T& t, index_manager const ofs) { ofs.correct_idx(t); }
   T correct(T idx) const {
     if (idx == T::invalid()) return idx;
     T new_idx = idx;
@@ -228,32 +228,31 @@ struct idx_offsets {
 
 private:
   vector_map<string_idx_t, string_idx_t> string_map;
-  idx_offset_t bitfield_offset{0};
-  idx_offset_t location_offset{0};
-  idx_offset_t route_offset{0};
-  idx_offset_t route_id_offset{0};
-  idx_offset_t transport_offset{0};
-  idx_offset_t merged_trips_offset{0};
-  idx_offset_t timezone_offset{0};
-  idx_offset_t source_offset{0};
-  idx_offset_t source_file_offset{0};
-  idx_offset_t trip_offset{0};
-  idx_offset_t trip_id_offset{0};
-  idx_offset_t trip_direction_offset{0};
-  idx_offset_t trip_direction_string_offset{0};
-  idx_offset_t trip_line_offset{0};
-  idx_offset_t attribute_offset{0};
-  idx_offset_t attribute_combination_offset{0};
-  idx_offset_t provider_offset{0};
-  idx_offset_t area_offset{0};
+  idx_offset_t bitfield_offset_{0};
+  idx_offset_t location_offset_{0};
+  idx_offset_t route_offset_{0};
+  idx_offset_t route_id_offset_{0};
+  idx_offset_t transport_offset_{0};
+  idx_offset_t merged_trips_offset_{0};
+  idx_offset_t timezone_offset_{0};
+  idx_offset_t source_offset_{0};
+  idx_offset_t source_file_offset_{0};
+  idx_offset_t trip_offset_{0};
+  idx_offset_t trip_id_offset_{0};
+  idx_offset_t trip_direction_offset_{0};
+  idx_offset_t trip_direction_string_offset_{0};
+  idx_offset_t trip_line_offset_{0};
+  idx_offset_t attribute_offset_{0};
+  idx_offset_t attribute_combination_offset_{0};
+  idx_offset_t provider_offset_{0};
+  idx_offset_t area_offset_{0};
 };
 
 void merge_tables(timetable& lhs,
                   timetable&& rhs,
                   string_cache_t& str_cache,
                   std::mutex* cache_mutex) {
-
-  idx_offsets ofs(lhs, rhs, str_cache, cache_mutex);
+  index_manager ofs(lhs, rhs, str_cache, cache_mutex);
 
   assert(lhs.date_range_ == rhs.date_range_);
 
