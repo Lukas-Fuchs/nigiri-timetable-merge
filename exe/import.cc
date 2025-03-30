@@ -30,6 +30,7 @@ int main(int ac, char** av) {
   auto n_days = 365U;
   auto recursive = false;
   auto ignore = false;
+  auto n_threads = 1U;
 
   auto finalize_opt = finalize_options{};
   auto c = loader_config{};
@@ -43,6 +44,10 @@ int main(int ac, char** av) {
       ("ignore", bpo::bool_switch(&ignore)->default_value(false),
        "ignore if a directory entry is not a timetable (only for recursive)")  //
       ("out,o", bpo::value(&out)->default_value(out), "output file path")  //
+      ("parallel,p",
+       bpo::value(&n_threads)->default_value(1)->implicit_value(0),
+       "use multiple threads for loading (0 will spawn as many threads as "
+       "files)")  //
       ("start_date,s", bpo::value(&start_date)->default_value(start_date),
        "start date of the timetable, format: YYYY-MM-DD")  //
       ("num_days,n", bpo::value(&n_days)->default_value(n_days),
@@ -114,6 +119,6 @@ int main(int ac, char** av) {
 
   auto const start = parse_date(start_date);
   load(input_files, finalize_opt, {start, start + date::days{n_days}},
-       assistance.get(), shapes.get(), ignore && recursive)
+       assistance.get(), shapes.get(), ignore && recursive, n_threads)
       .write(out);
 }

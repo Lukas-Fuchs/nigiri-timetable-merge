@@ -24,7 +24,8 @@ timetable load(std::vector<std::pair<std::string, loader_config>> const&,
                interval<date::sys_days> const&,
                assistance_times* = nullptr,
                shapes_storage* = nullptr,
-               bool ignore = false);
+               bool ignore = false,
+               unsigned int n_threads = 1);
 
 timetable parallel_load(
     std::vector<std::pair<std::string, loader_config>> const&,
@@ -32,7 +33,8 @@ timetable parallel_load(
     interval<date::sys_days> const&,
     assistance_times* = nullptr,
     shapes_storage* = nullptr,
-    bool ignore = false);
+    bool ignore = false,
+    unsigned int n_threads = 0);
 
 timetable serial_load(std::vector<std::pair<std::string, loader_config>> const&,
                       finalize_options const&,

@@ -13,7 +13,8 @@ namespace nigiri::loader {
 struct loading_threadpool {
   struct non_threadsafe_loader_exception : std::exception {};
 
-  loading_threadpool(std::vector<std::unique_ptr<loader_interface>> const&,
+  loading_threadpool(unsigned int n_threads,
+                     std::vector<std::unique_ptr<loader_interface>> const&,
                      std::vector<std::pair<std::string, loader_config>> const&,
                      interval<date::sys_days> const&,
                      assistance_times*,

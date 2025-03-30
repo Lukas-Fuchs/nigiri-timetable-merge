@@ -28,8 +28,14 @@ timetable load(std::vector<std::pair<std::string, loader_config>> const& paths,
                interval<date::sys_days> const& date_range,
                assistance_times* a,
                shapes_storage* shapes,
-               bool ignore) {
-  return parallel_load(paths, finalize_opt, date_range, a, shapes, ignore);
+               bool ignore,
+               unsigned int n_threads) {
+  if (n_threads == 1) {
+    return serial_load(paths, finalize_opt, date_range, a, shapes, ignore);
+  } else {
+    return parallel_load(paths, finalize_opt, date_range, a, shapes, ignore,
+                         n_threads);
+  }
 }
 
 timetable serial_load(
@@ -88,14 +94,15 @@ timetable parallel_load(
     interval<date::sys_days> const& date_range,
     assistance_times* a,
     shapes_storage* shapes,
-    bool ignore) {
+    bool ignore,
+    unsigned int n_threads) {
   if (paths.size() < 2) {
     return serial_load(paths, finalize_opt, date_range, a, shapes, ignore);
   }
 
   try {
     auto const loaders = get_loaders();
-    loading_threadpool loader(loaders, paths, date_range, a, shapes);
+    loading_threadpool loader(n_threads, loaders, paths, date_range, a, shapes);
     auto table = loader.get_result();
     finalize(table, finalize_opt);
     return table;

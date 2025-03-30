@@ -6,6 +6,7 @@
 
 namespace nigiri::loader {
 loading_threadpool::loading_threadpool(
+    unsigned int n_threads,
     std::vector<std::unique_ptr<loader_interface>> const& loaders,
     std::vector<std::pair<std::string, loader_config>> const& paths,
     interval<date::sys_days> const& date_range,
@@ -15,6 +16,11 @@ loading_threadpool::loading_threadpool(
       loaders_(loaders),
       assistance_(a),
       shapes_(shapes) {
+
+  // 0 means "use as many threads as files".
+  if (n_threads == 0 || n_threads > paths.size()) {
+    n_threads = paths.size();
+  }
 
   tables_.resize(paths.size());
   tables_[0].date_range_ = date_range;
@@ -55,8 +61,6 @@ loading_threadpool::loading_threadpool(
   }
 
   merge_ops_left_ = tables_.size() - 1;
-  size_t const n_threads = tables_.size();
-  // std::min(tables_.size(), size_t(std::thread::hardware_concurrency()));
 
   workers_.reserve(n_threads);
   for (size_t i = 0; i < n_threads; ++i) {
