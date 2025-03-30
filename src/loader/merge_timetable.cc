@@ -1,4 +1,4 @@
-#include "nigiri/loader/gtfs/merge_timetable.h"
+#include "nigiri/loader/merge_timetable.h"
 
 #include <concepts>
 #include <cstdint>
@@ -6,7 +6,7 @@
 #include "nigiri/timetable.h"
 #include "utl/enumerate.h"
 
-namespace nigiri::loader::gtfs {
+namespace nigiri::loader {
 
 using nigiri::timetable;
 
@@ -451,4 +451,4 @@ void merge_tables(timetable& lhs,
                                                std::move(rhs.location_areas_));
 }
 
-}  // namespace nigiri::loader::gtfs
+}  // namespace nigiri::loader

@@ -3,7 +3,7 @@
 #include "nigiri/loader/load.h"
 #include "nigiri/loader/loader_interface.h"
 #include "nigiri/string_store.h"
-#include "compare_timetables.h"
+#include "../compare_timetables.h"
 #include "date/date.h"
 #include "test_data.h"
 

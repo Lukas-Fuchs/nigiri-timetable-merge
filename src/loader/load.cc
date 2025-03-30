@@ -6,7 +6,6 @@
 
 #include "nigiri/loader/dir.h"
 #include "nigiri/loader/gtfs/loader.h"
-#include "nigiri/loader/gtfs/merge_timetable.h"
 #include "nigiri/loader/hrd/loader.h"
 #include "nigiri/loader/init_finish.h"
 #include "nigiri/loader/loading_threadpool.h"

@@ -2,7 +2,7 @@
 
 #include "utl/enumerate.h"
 
-#include "nigiri/loader/gtfs/merge_timetable.h"
+#include "nigiri/loader/merge_timetable.h"
 
 namespace nigiri::loader {
 loading_threadpool::loading_threadpool(
@@ -92,7 +92,7 @@ void loading_threadpool::load(loading_work_item&& work) {
 }
 
 void loading_threadpool::merge(size_t l, size_t r) {
-  gtfs::merge_tables(tables_[l], std::move(tables_[r]), *cache_, &table_mutex_);
+  merge_tables(tables_[l], std::move(tables_[r]), *cache_, &table_mutex_);
   {
     std::lock_guard g(work_mutex_);
     mergable_tables_.push(l);

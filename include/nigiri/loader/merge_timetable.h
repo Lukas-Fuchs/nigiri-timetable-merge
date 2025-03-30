@@ -8,7 +8,7 @@ namespace nigiri {
 struct timetable;
 }  // namespace nigiri
 
-namespace nigiri::loader::gtfs {
+namespace nigiri::loader {
 void merge_tables(timetable& lhs,
                   timetable&& rhs,
                   string_cache_t& str_cache,
