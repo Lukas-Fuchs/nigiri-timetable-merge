@@ -377,6 +377,13 @@ void merge_tables(timetable& lhs,
 
   ofs.merge_vector(lhs.route_stop_times_, std::move(rhs.route_stop_times_));
 
+  ofs.merge_vector_map<transport_idx_t, duration_t>(
+      lhs.transport_first_dep_offset_,
+      std::move(rhs.transport_first_dep_offset_));
+
+  ofs.merge_vector_map<transport_idx_t, std::uint8_t>(
+      lhs.initial_day_offset_, std::move(rhs.initial_day_offset_));
+
   ofs.merge_vector_map<transport_idx_t, bitfield_idx_t>(
       lhs.transport_traffic_days_, std::move(rhs.transport_traffic_days_));
 
