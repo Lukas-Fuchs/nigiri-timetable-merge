@@ -180,9 +180,23 @@ private:
           [&](transport_idx_t l, transport_idx_t r) {
             auto const l_dbg = lhs_.dbg(l);
             auto const r_dbg = rhs_.dbg(r);
-            return l_dbg.path_ == r_dbg.path_ &&
-                   l_dbg.line_from_ == r_dbg.line_from_ &&
-                   l_dbg.line_to_ == r_dbg.line_to_;
+            bool const match = l_dbg.path_ == r_dbg.path_ &&
+                               l_dbg.line_from_ == r_dbg.line_from_ &&
+                               l_dbg.line_to_ == r_dbg.line_to_ &&
+                               lhs_.transport_first_dep_offset_[l] ==
+                                   rhs_.transport_first_dep_offset_[r] &&
+                               lhs_.transport_traffic_days_[l] ==
+                                   rhs_.transport_traffic_days_[r];
+
+            if (match && transport_map_.contains(l)) {
+              std::cout << "Ambiguous transport mapping. This is probably a "
+                           "limitation "
+                           "of the test, not a bug.\n";
+              std::cout << "Transport " << l << " would be mapped to "
+                        << transport_map_[l] << " and " << r << ".\n";
+              return false;
+            }
+            return match;
           },
           [&](transport_idx_t l, transport_idx_t r) { transport_map_[l] = r; },
           [&](transport_idx_t const l) {
@@ -278,7 +292,7 @@ private:
         auto const& l_transport = lhs_.route_transport_ranges_[l];
         auto const& r_transport = rhs_.route_transport_ranges_[r];
         if ((r_transport.from_ != transport_map_.at(l_transport.from_)) ||
-            (r_transport.to_ != transport_map_.at(l_transport.to_))) {
+            (r_transport.to_ - 1 != transport_map_.at(l_transport.to_ - 1))) {
           std::cout << "Mismatching route transport ranges.\n";
           return false;
         }
@@ -398,22 +412,46 @@ private:
         return false;
       }
 
-      for (auto const& [l_eq, r_eq] :
-           utl::zip(lhs_.locations_.equivalences_[l],
-                    rhs_.locations_.equivalences_[r])) {
-        if (r_eq != location_map_.at(l_eq)) {
-          std::cout << "Mismatching location equivalences" << std::endl;
+      for (auto const& l_eq : lhs_.locations_.equivalences_[l]) {
+        auto const expected_r_eq = location_map_.at(l_eq);
+        bool found = false;
+        for (auto const& r_eq : rhs_.locations_.equivalences_[r]) {
+          if (r_eq == expected_r_eq) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          std::cout << "Mismatching location equivalences: " << expected_r_eq
+                    << " not in\n\t[";
+          for (auto const& r_eq : rhs_.locations_.equivalences_[r]) {
+            std::cout << r_eq << " ";
+          }
+          std::cout << "]\n";
           return false;
         }
       }
 
-      for (auto const& [l_child, r_child] : utl::zip(
-               lhs_.locations_.children_[l], rhs_.locations_.children_[r])) {
-        if (r_child != location_map_.at(l_child)) {
+      for (auto const& l_child : lhs_.locations_.children_[l]) {
+        auto const expected_r_child = location_map_.at(l_child);
+        bool found = false;
+        for (auto const& r_child : rhs_.locations_.children_[r]) {
+          if (r_child == expected_r_child) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
           std::cout << "Child mismatch for location "
-                    << lhs_.locations_.names_[l].view() << ": "
-                    << lhs_.locations_.names_[l_child].view()
-                    << " != " << lhs_.locations_.names_[r_child].view() << "\n";
+                    << lhs_.locations_.names_[l].view() << ":\n\tL: ";
+          for (auto const l_child : lhs_.locations_.children_[l]) {
+            std::cout << l_child << " ";
+          }
+          std::cout << "\n\tR: ";
+          for (auto const r_child : rhs_.locations_.children_[r]) {
+            std::cout << r_child << " ";
+          }
+
           return false;
         }
 
@@ -429,6 +467,7 @@ private:
           return true;
         };
 
+        auto const r_child = location_map_.at(l_child);
         if (!check_parent_child_relation(lhs_, l, l_child) ||
             !check_parent_child_relation(rhs_, r, r_child)) {
           return false;
