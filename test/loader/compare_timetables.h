@@ -180,13 +180,14 @@ private:
           [&](transport_idx_t l, transport_idx_t r) {
             auto const l_dbg = lhs_.dbg(l);
             auto const r_dbg = rhs_.dbg(r);
-            bool const match = l_dbg.path_ == r_dbg.path_ &&
-                               l_dbg.line_from_ == r_dbg.line_from_ &&
-                               l_dbg.line_to_ == r_dbg.line_to_ &&
-                               lhs_.transport_first_dep_offset_[l] ==
-                                   rhs_.transport_first_dep_offset_[r] &&
-                               lhs_.transport_traffic_days_[l] ==
-                                   rhs_.transport_traffic_days_[r];
+            bool const match =
+                l_dbg.path_ == r_dbg.path_ &&
+                l_dbg.line_from_ == r_dbg.line_from_ &&
+                l_dbg.line_to_ == r_dbg.line_to_ &&
+                lhs_.transport_first_dep_offset_[l] ==
+                    rhs_.transport_first_dep_offset_[r] &&
+                lhs_.bitfields_[lhs_.transport_traffic_days_[l]] ==
+                    rhs_.bitfields_[rhs_.transport_traffic_days_[r]];
 
             if (match && transport_map_.contains(l)) {
               std::cout << "Ambiguous transport mapping. This is probably a "

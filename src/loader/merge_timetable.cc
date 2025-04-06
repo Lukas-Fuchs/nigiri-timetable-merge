@@ -89,6 +89,7 @@ struct index_manager {
   attribute correct(attribute const& a) const { return a; }
   delta correct(delta const& a) const { return a; }
   geo::latlng correct(geo::latlng const& a) const { return a; }
+  duration_t correct(duration_t const& a) const { return a; }
   u8_minutes correct(u8_minutes const& a) const { return a; }
   location_type correct(location_type const& a) const { return a; }
   timezone correct(timezone const& a) const { return a; }
