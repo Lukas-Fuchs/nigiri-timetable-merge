@@ -5,6 +5,8 @@
 
 #include "nigiri/loader/dir.h"
 #include "nigiri/loader/gtfs/loader.h"
+#include "nigiri/loader/gtfs/shape.h"
+#include "nigiri/loader/gtfs/trip.h"
 #include "nigiri/loader/init_finish.h"
 #include "nigiri/timetable.h"
 
@@ -41,6 +43,8 @@ private:
   std::vector<loading_work_item> load_queue_;
   std::queue<size_t> mergable_tables_;
   std::vector<timetable> tables_;
+  std::vector<gtfs::shape_loader_state> table_shapes_;
+  std::vector<gtfs::trip_data> table_trip_data_;
   std::atomic<size_t> merge_ops_left_;
 
   interval<date::sys_days> const& date_range_;

@@ -14,6 +14,11 @@ struct shapes_storage;
 struct timetable;
 }  // namespace nigiri
 
+namespace nigiri::loader::gtfs {
+struct shape_loader_state;
+struct trip_data;
+}  // namespace nigiri::loader::gtfs
+
 namespace nigiri::loader {
 
 struct loader_config {
@@ -42,6 +47,8 @@ struct loader_interface {
                                string_cache_t&,
                                assistance_times*,
                                shapes_storage*,
+                               gtfs::shape_loader_state*,
+                               gtfs::trip_data*,
                                std::mutex&) const {
     assert(false &&
            "Tried to call threadsafe load function on non-threadsafe loader");

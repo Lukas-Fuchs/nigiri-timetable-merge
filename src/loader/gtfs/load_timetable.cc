@@ -103,6 +103,8 @@ void load_timetable_impl(loader_config const& config,
                          string_cache_t& str_cache,
                          assistance_times* assistance,
                          shapes_storage* shapes_data,
+                         gtfs::shape_loader_state* shape_states,
+                         gtfs::trip_data* trip_data,
                          std::mutex& mtx) {
   nigiri::scoped_timer const global_timer{"gtfs parser"};
 
@@ -122,17 +124,17 @@ void load_timetable_impl(loader_config const& config,
   auto const dates = read_calendar_date(load(kCalendarDatesFile).data());
   auto const service =
       merge_traffic_days(tt.internal_interval_days(), calendar, dates);
-  auto const shape_states = [&]() {
+  *shape_states = [&]() {
     std::unique_lock lock(mtx);
     return (shapes_data != nullptr)
                ? parse_shapes(load(kShapesFile).data(), *shapes_data)
                : shape_loader_state{};
   }();
-  auto trip_data =
-      read_trips(tt, routes, service, shape_states, load(kTripsFile).data(),
+  *trip_data =
+      read_trips(tt, routes, service, *shape_states, load(kTripsFile).data(),
                  config.bikes_allowed_default_);
-  read_frequencies(trip_data, load(kFrequenciesFile).data());
-  read_stop_times(tt, trip_data, stops, load(kStopTimesFile).data(),
+  read_frequencies(*trip_data, load(kFrequenciesFile).data());
+  read_stop_times(tt, *trip_data, stops, load(kStopTimesFile).data(),
                   shapes_data != nullptr);
   {
     std::unique_lock lock(mtx);
@@ -143,7 +145,7 @@ void load_timetable_impl(loader_config const& config,
 
   {
     auto const timer = scoped_timer{"loader.gtfs.trips.sort"};
-    for (auto& t : trip_data.data_) {
+    for (auto& t : trip_data->data_) {
       if (t.requires_sorting_) {
         t.stop_headsigns_.resize(t.seq_numbers_.size());
         std::tie(t.seq_numbers_, t.stop_seq_, t.event_times_, t.stop_headsigns_,
@@ -156,7 +158,7 @@ void load_timetable_impl(loader_config const& config,
 
   {
     auto const timer = scoped_timer{"loader.gtfs.trips.interpolate"};
-    for (auto& t : trip_data.data_) {
+    for (auto& t : trip_data->data_) {
       t.interpolate();
     }
   }
@@ -172,13 +174,13 @@ void load_timetable_impl(loader_config const& config,
   auto const get_bikes_allowed_seq =
       [&](std::basic_string<gtfs_trip_idx_t> const& trips) -> bitvec const* {
     if (trips.size() == 1U) {
-      return trip_data.get(trips.front()).bikes_allowed_
+      return trip_data->get(trips.front()).bikes_allowed_
                  ? &kSingleTripBikesAllowed
                  : &kSingleTripBikesNotAllowed;
     } else {
       bikes_allowed_seq_cache.resize(0);
       for (auto const [i, t_idx] : utl::enumerate(trips)) {
-        auto const& trp = trip_data.get(t_idx);
+        auto const& trp = trip_data->get(t_idx);
         auto const stop_count = trp.stop_seq_.size();
         auto const offset = bikes_allowed_seq_cache.size();
         bikes_allowed_seq_cache.resize(
@@ -195,10 +197,10 @@ void load_timetable_impl(loader_config const& config,
                             bitfield const* traffic_days) {
     std::unique_lock lock(mtx);
     expand_trip(
-        trip_data, noon_offsets, tt, trips, traffic_days, tt.date_range_,
+        *trip_data, noon_offsets, tt, trips, traffic_days, tt.date_range_,
         assistance, [&](utc_trip&& s) {
-          auto const* stop_seq = get_stop_seq(trip_data, s, stop_seq_cache);
-          auto const clasz = trip_data.get(s.trips_.front()).get_clasz(tt);
+          auto const* stop_seq = get_stop_seq(*trip_data, s, stop_seq_cache);
+          auto const clasz = trip_data->get(s.trips_.front()).get_clasz(tt);
           auto const* bikes_allowed_seq = get_bikes_allowed_seq(s.trips_);
           auto const it = route_services.find(
               route_key_ptr_t{clasz, stop_seq, bikes_allowed_seq});
@@ -222,10 +224,10 @@ void load_timetable_impl(loader_config const& config,
   {
     progress_tracker->status("Expand Trips")
         .out_bounds(68.F, 83.F)
-        .in_high(trip_data.data_.size());
+        .in_high(trip_data->data_.size());
     auto const timer = scoped_timer{"loader.gtfs.trips.expand"};
 
-    for (auto const [i, t] : utl::enumerate(trip_data.data_)) {
+    for (auto const [i, t] : utl::enumerate(trip_data->data_)) {
       if (t.block_ != nullptr) {
         continue;
       }
@@ -240,8 +242,8 @@ void load_timetable_impl(loader_config const& config,
         .in_high(route_services.size());
     auto const timer = scoped_timer{"loader.gtfs.trips.block_id"};
 
-    for (auto const& [_, blk] : trip_data.blocks_) {
-      for (auto const& [trips, traffic_days] : blk->rule_services(trip_data)) {
+    for (auto const& [_, blk] : trip_data->blocks_) {
+      for (auto const& [trips, traffic_days] : blk->rule_services(*trip_data)) {
         add_trip(trips, &traffic_days);
       }
     }
@@ -261,7 +263,7 @@ void load_timetable_impl(loader_config const& config,
     auto stop_seq_numbers = std::basic_string<stop_idx_t>{};
     auto const source_file_idx =
         tt.register_source_file((d.path() / kStopTimesFile).generic_string());
-    for (auto& trp : trip_data.data_) {
+    for (auto& trp : trip_data->data_) {
       std::uint32_t train_nr = 0U;
       if (is_train_number(trp.short_name_)) {
         train_nr = static_cast<std::uint32_t>(std::stoul(trp.short_name_));
@@ -298,7 +300,7 @@ void load_timetable_impl(loader_config const& config,
         }
 
         for (auto const& s : services) {
-          auto const& first = trip_data.get(s.trips_.front());
+          auto const& first = trip_data->get(s.trips_.front());
 
           external_trip_ids.clear();
           section_directions.clear();
@@ -306,7 +308,7 @@ void load_timetable_impl(loader_config const& config,
           route_colors.clear();
           auto prev_end = std::uint16_t{0U};
           for (auto const [i, t] : utl::enumerate(s.trips_)) {
-            auto& trp = trip_data.get(t);
+            auto& trp = trip_data->get(t);
 
             auto const end =
                 static_cast<std::uint16_t>(prev_end + trp.stop_seq_.size());
@@ -384,12 +386,6 @@ void load_timetable_impl(loader_config const& config,
       progress_tracker->increment();
     }
 
-    if (shapes_data != nullptr) {
-      std::unique_lock lock(mtx);
-      calculate_shape_offsets_and_bboxes(tt, *shapes_data, shape_states,
-                                         trip_data.data_);
-    }
-
     // Build location_routes map
     for (auto l = tt.location_routes_.size(); l != tt.n_locations(); ++l) {
       tt.location_routes_.emplace_back(location_routes[location_idx_t{l}]);
@@ -397,7 +393,7 @@ void load_timetable_impl(loader_config const& config,
     }
 
     // Build transport ranges.
-    for (auto const& t : trip_data.data_) {
+    for (auto const& t : trip_data->data_) {
       tt.trip_transport_ranges_.emplace_back(t.transport_ranges_);
     }
   }
@@ -412,8 +408,15 @@ void load_timetable(loader_config const& config,
                     assistance_times* assistance,
                     shapes_storage* shapes_data) {
   std::mutex mtx;
+  shape_loader_state shape_states;
+  trip_data trip_data;
   load_timetable_impl(config, src, d, tt, bitfield_indices, str_cache,
-                      assistance, shapes_data, mtx);
+                      assistance, shapes_data, &shape_states, &trip_data, mtx);
+  if (shapes_data != nullptr) {
+    assert(shape_states.index_offset_ != uint32_t(shape_idx_t::invalid()));
+    calculate_shape_offsets_and_bboxes(tt, *shapes_data, shape_states,
+                                       trip_data.data_);
+  }
 }
 
 void load_timetable_threadsafe(
@@ -425,9 +428,11 @@ void load_timetable_threadsafe(
     string_cache_t& str_cache,
     assistance_times* assistance,
     shapes_storage* shapes_data,
+    gtfs::shape_loader_state* shape_states,
+    gtfs::trip_data* trip_data,
     std::mutex& mtx) {
   load_timetable_impl(config, src, d, tt, bitfield_indices, str_cache,
-                      assistance, shapes_data, mtx);
+                      assistance, shapes_data, shape_states, trip_data, mtx);
 }
 
 }  // namespace nigiri::loader::gtfs

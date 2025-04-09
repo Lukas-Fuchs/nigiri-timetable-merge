@@ -2,6 +2,8 @@
 
 #include "utl/enumerate.h"
 
+#include "nigiri/loader/gtfs/shape.h"
+#include "nigiri/loader/gtfs/shape_prepare.h"
 #include "nigiri/loader/merge_timetable.h"
 
 namespace nigiri::loader {
@@ -23,6 +25,8 @@ loading_threadpool::loading_threadpool(
   }
 
   tables_.resize(paths.size());
+  table_shapes_.resize(paths.size());
+  table_trip_data_.resize(paths.size());
   tables_[0].date_range_ = date_range;
   register_special_stations(tables_[0]);
 
@@ -73,7 +77,37 @@ timetable loading_threadpool::get_result() {
     t.join();
   }
   assert(mergable_tables_.size() == 1);
-  return std::move(tables_[mergable_tables_.front()]);
+  auto const tt_idx = mergable_tables_.front();
+  auto& tt = tables_[tt_idx];
+  if (shapes_ != nullptr) {
+    std::sort(begin(table_shapes_), end(table_shapes_),
+              [](auto const& l, auto const& r) {
+                return l.index_offset_ < r.index_offset_;
+              });
+    auto& shapes = table_shapes_[0];
+    assert(shapes.index_offset_ == 0);
+    for (size_t i = 1; i < table_shapes_.size(); ++i) {
+      auto& s = table_shapes_[i];
+      for (auto&& d : s.distances_) {
+        shapes.distances_.emplace_back(std::move(d));
+      }
+
+      // TODO: This may not be needed as the map seems to be only used as a
+      // size indicator after this. If there is no other intended use just
+      // add some other indicator.
+      for (auto [id, idx] : s.id_map_) {
+        if (shapes.id_map_.contains(id)) {
+          id = id + std::to_string(uint32_t(idx));
+          assert(!shapes.id_map_.contains(id));
+        }
+        shapes.id_map_[id] = idx;
+      }
+    }
+
+    calculate_shape_offsets_and_bboxes(tt, *shapes_, shapes,
+                                       table_trip_data_[tt_idx].data_);
+  }
+  return std::move(tt);
 }
 
 void loading_threadpool::load(loading_work_item&& work) {
@@ -83,7 +117,8 @@ void loading_threadpool::load(loading_work_item&& work) {
     tt.date_range_ = date_range_;
     loaders_[work.loader_idx_]->load_threadsafe(
         work.config_, source_idx_t(0), *work.dir_, tt, bitfields_, *cache_,
-        assistance_, shapes_, table_mutex_);
+        assistance_, shapes_, &table_shapes_[work.table_idx_],
+        &table_trip_data_[work.table_idx_], table_mutex_);
   } catch (std::exception const& e) {
     throw utl::fail("failed to load {}: {}", work.path_, e.what());
   }
@@ -92,7 +127,8 @@ void loading_threadpool::load(loading_work_item&& work) {
 }
 
 void loading_threadpool::merge(size_t l, size_t r) {
-  merge_tables(tables_[l], std::move(tables_[r]), *cache_, &table_mutex_);
+  merge_tables(tables_[l], std::move(tables_[r]), table_trip_data_[l],
+               table_trip_data_[r], *cache_, &table_mutex_);
   {
     std::lock_guard g(work_mutex_);
     mergable_tables_.push(l);

@@ -3,12 +3,14 @@
 #include <concepts>
 #include <cstdint>
 
+#include "nigiri/loader/gtfs/trip.h"
 #include "nigiri/timetable.h"
 #include "utl/enumerate.h"
 
 namespace nigiri::loader {
 
 using nigiri::timetable;
+using nigiri::loader::gtfs::trip;
 
 template <typename V>
 concept Iterable = requires(V v) {
@@ -82,6 +84,10 @@ struct index_manager {
   void correct_idx(provider_idx_t& idx) const { idx += provider_offset_; }
   void correct_idx(area_idx_t& idx) const { idx += area_offset_; }
 
+  // Shape indices are explicitly not corrected because they refer to shared
+  // state and should remain stable.
+  void correct_idx(shape_idx_t&) const {};
+
   uint32_t correct(uint32_t const a) const { return a; }
   string correct(string const& a) const { return a; }
   route_color correct(route_color const& a) const { return a; }
@@ -127,6 +133,15 @@ struct index_manager {
   trip_direction_t correct(trip_direction_t const& td) const {
     return td.apply(
         [&](auto const& d) -> trip_direction_t { return correct(d); });
+  }
+
+  trip correct(trip&& t) const {
+    t.headsign_ = correct(t.headsign_);
+    t.shape_idx_ = correct(t.shape_idx_);
+    t.stop_headsigns_ = correct(std::move(t.stop_headsigns_));
+    t.trip_idx_ = correct(t.trip_idx_);
+    t.transport_ranges_ = correct(std::move(t.transport_ranges_));
+    return std::move(t);
   }
 
   template <typename T>
@@ -251,6 +266,8 @@ private:
 
 void merge_tables(timetable& lhs,
                   timetable&& rhs,
+                  gtfs::trip_data& lhs_trip_data,
+                  gtfs::trip_data& rhs_trip_data,
                   string_cache_t& str_cache,
                   std::mutex* cache_mutex) {
   index_manager ofs(lhs, rhs, str_cache, cache_mutex);
@@ -457,6 +474,9 @@ void merge_tables(timetable& lhs,
 
   ofs.merge_vecvec<location_idx_t, area_idx_t>(lhs.location_areas_,
                                                std::move(rhs.location_areas_));
+
+  ofs.merge_vector_map<gtfs::gtfs_trip_idx_t, trip>(
+      lhs_trip_data.data_, std::move(rhs_trip_data.data_));
 }
 
 }  // namespace nigiri::loader

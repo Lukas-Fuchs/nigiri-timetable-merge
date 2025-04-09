@@ -42,6 +42,8 @@ void load_timetable_threadsafe(loader_config const&,
                                string_cache_t&,
                                assistance_times*,
                                shapes_storage*,
+                               gtfs::shape_loader_state*,
+                               gtfs::trip_data*,
                                std::mutex&);
 
 }  // namespace nigiri::loader::gtfs

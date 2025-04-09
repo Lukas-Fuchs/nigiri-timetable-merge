@@ -23,6 +23,8 @@ struct gtfs_loader : public loader_interface {
                        string_cache_t&,
                        assistance_times*,
                        shapes_storage*,
+                       gtfs::shape_loader_state*,
+                       gtfs::trip_data*,
                        std::mutex&) const override;
   cista::hash_t hash(dir const&) const override;
   std::string_view name() const override;

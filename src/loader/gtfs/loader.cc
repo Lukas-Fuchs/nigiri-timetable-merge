@@ -30,10 +30,12 @@ void gtfs_loader::load_threadsafe(
     string_cache_t& cache,
     assistance_times* assistance,
     shapes_storage* shapes_data,
+    gtfs::shape_loader_state* shape_states,
+    gtfs::trip_data* trip_data,
     std::mutex& mtx) const {
   return nigiri::loader::gtfs::load_timetable_threadsafe(
       c, src, d, tt, global_bitfield_indices, cache, assistance, shapes_data,
-      mtx);
+      shape_states, trip_data, mtx);
 }
 
 cista::hash_t gtfs_loader::hash(dir const& d) const {
