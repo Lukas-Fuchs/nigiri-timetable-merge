@@ -141,6 +141,9 @@ struct index_manager {
     t.stop_headsigns_ = correct(std::move(t.stop_headsigns_));
     t.trip_idx_ = correct(t.trip_idx_);
     t.transport_ranges_ = correct(std::move(t.transport_ranges_));
+    for (auto& s : t.stop_seq_) {
+      s += location_offset_;
+    }
     return std::move(t);
   }
 
