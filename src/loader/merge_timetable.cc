@@ -399,8 +399,11 @@ void merge_tables(timetable& lhs,
   ofs.merge_vecvec<location_idx_t, route_idx_t>(
       lhs.location_routes_, std::move(rhs.location_routes_));
 
-  ofs.merge_vector_map<route_idx_t, interval<std::uint32_t>>(
-      lhs.route_stop_time_ranges_, std::move(rhs.route_stop_time_ranges_));
+  size_t stop_time_offset = lhs.route_stop_times_.size();
+  for (auto&& range : rhs.route_stop_time_ranges_) {
+    lhs.route_stop_time_ranges_.emplace_back(range.from_ + stop_time_offset,
+                                             range.to_ + stop_time_offset);
+  }
 
   ofs.merge_vector(lhs.route_stop_times_, std::move(rhs.route_stop_times_));
 
