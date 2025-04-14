@@ -127,6 +127,13 @@ void loading_threadpool::load(loading_work_item&& work) {
 }
 
 void loading_threadpool::merge(size_t l, size_t r) {
+  assert(l != r);
+  // The first table contains the special stations and must be the leftmost one
+  // in the tree.
+  if (r == 0) {
+    merge(r, l);
+    return;
+  }
   merge_tables(tables_[l], std::move(tables_[r]), table_trip_data_[l],
                table_trip_data_[r], *cache_, &table_mutex_);
   {
